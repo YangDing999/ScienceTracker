@@ -2,148 +2,137 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 import google.generativeai as genai
+import streamlit_shadcn_ui as ui
 
-# --- 1. 页面基础配置 ---
-st.set_page_config(page_title="SciOracle AI | 全球科研智能枢纽", page_icon="🔮", layout="wide")
+# --- 1. 页面配置与主题注入 ---
+st.set_page_config(page_title="SciOracle AI | 科技情报枢纽", page_icon="🔮", layout="wide")
 
-# --- 2. 注入高级 AI 感 CSS ---
+# 注入自定义 CSS：深色背景 + 霓虹渐变 + 玻璃拟态
 st.markdown("""
     <style>
-    /* 全局背景：深邃星空渐变 */
     .stApp {
-        background: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%);
+        background: radial-gradient(circle at 20% 30%, #1e1b4b 0%, #020617 100%);
         color: #f8fafc;
     }
+    /* 隐藏原生 Streamlit 装饰 */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
     
-    /* 渐变标题文字 */
-    .hero-title {
-        background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+    /* 标题动效 */
+    .hero-text {
+        background: linear-gradient(to right, #818cf8, #c084fc, #fb7185);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 4.5rem; font-weight: 800; text-align: center; margin-bottom: 0.5rem;
+        font-weight: 800;
+        letter-spacing: -0.05em;
     }
-    
-    .hero-subtitle {
-        color: #94a3b8; text-align: center; font-size: 1.5rem; margin-bottom: 3rem;
-    }
-
-    /* 玻璃拟态卡片 */
-    .glass-card {
-        background: rgba(30, 41, 59, 0.4);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 2rem; border-radius: 1.5rem; text-align: center;
-        transition: transform 0.3s ease, border-color 0.3s ease;
-    }
-    .glass-card:hover {
-        transform: translateY(-10px);
-        border-color: #6366f1;
-        background: rgba(30, 41, 59, 0.6);
-    }
-
-    /* 隐藏原有的 Streamlit 元素以增强沉浸感 */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 初始化连接 (保持不变) ---
+# --- 2. 初始化连接 (缓存处理) ---
 @st.cache_resource
 def init_connections():
     try:
         db = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        # 寻找可用模型
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        target_model = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in available_models else available_models[0]
-        return db, genai.GenerativeModel(target_model), target_model
+        # 探测可用模型
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in models else models[0]
+        return db, genai.GenerativeModel(target), target
     except:
-        return None, None, "Disconnected"
+        return None, None, "Offline"
 
 supabase, model, model_name = init_connections()
 
-# --- 4. 状态管理：控制显示首页还是探索页 ---
+# --- 3. 状态管理 ---
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
-def go_to_explore():
-    st.session_state.page = 'explore'
-
-def go_to_home():
-    st.session_state.page = 'home'
-
-# --- 5. 首页逻辑 (Landing Page) ---
+# --- 4. 首页设计 (Landing Page) ---
 if st.session_state.page == 'home':
-    st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)
-    st.markdown("<h1 class='hero-title'>SciOracle AI</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='hero-subtitle'>解码全球科研资助逻辑，洞察下一个科技引爆点</p>", unsafe_allow_html=True)
-    
-    # 显著的探索按钮
-    col_btn, _ = st.columns([1, 10]) # 居中对齐的小技巧
-    with st.container():
-        _, center_col, _ = st.columns([2, 2, 2])
-        with center_col:
-            if st.button("🚀 开启数据探索之旅", use_container_width=True, type="primary"):
-                go_to_explore()
-                st.rerun()
-
+    # 顶部留白
     st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
+    
+    # 主标题区
+    st.markdown("<h1 style='text-align: center; font-size: 5rem;' class='hero-text'>SciOracle AI</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size: 1.5rem; color: #94a3b8; margin-bottom: 50px;'>下一代科研资助情报分析引擎，穿透学术迷雾。</p>", unsafe_allow_html=True)
+    
+    # 使用 Shadcn UI 的 Metric Cards 展示实力
+    _, m_col, _ = st.columns([1, 6, 1])
+    with m_col:
+        cols = st.columns(3)
+        with cols[0]:
+            ui.metric_card(title="情报覆盖", content="2.5B+", description="全球论文与资助关联数据", key="m1")
+        with cols[1]:
+            ui.metric_card(title="分析引擎", content="Gemini 1.5", description="深度语义与逻辑推理", key="m2")
+        with cols[2]:
+            ui.metric_card(title="查询延迟", content="< 500ms", description="分布式云端数据库响应", key="m3")
+    
+    st.markdown("<div style='height: 60px;'></div>", unsafe_allow_html=True)
+    
+    # 显著的探索入口
+    _, btn_col, _ = st.columns([2, 1, 2])
+    with btn_col:
+        with ui.card(key="explore_entry"):
+            st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+            st.write("准备好深入数据了吗？")
+            if ui.button("🚀 开启探索", variant="default", key="go_btn", class_name="w-full"):
+                st.session_state.page = 'explore'
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # 功能卡片展示
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown("""<div class='glass-card'><h3>🔍 智能检索</h3><p>覆盖 2.5 亿篇论文，秒级定位核心文献与项目编号。</p></div>""", unsafe_allow_html=True)
-    with c2:
-        st.markdown("""<div class='glass-card'><h3>🧠 AI 研报</h3><p>基于 Gemini 1.5 Pro，自动生成专家级技术趋势分析。</p></div>""", unsafe_allow_html=True)
-    with c3:
-        st.markdown("""<div class='glass-card'><h3>📊 资助图谱</h3><p>穿透资助方与机构关系，揭示科研经费流动真相。</p></div>""", unsafe_allow_html=True)
+    # 底部装饰性图标
+    st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)
+    ui.badges(badge_list=[("权威数据源", "outline"), ("AI 驱动", "destructive"), ("实时更新", "secondary")], class_name="flex justify-center gap-4")
 
-# --- 6. 探索页逻辑 (App Workspace) ---
+# --- 5. 探索工作台 (Workspace) ---
 else:
+    # 侧边栏导航
     with st.sidebar:
-        st.markdown("## 🔮 SciOracle Workspace")
-        if st.button("🏠 返回首页"):
-            go_to_home()
+        st.markdown("<h2 class='hero-text'>SciOracle</h2>", unsafe_allow_html=True)
+        if ui.button("🏠 返回门户首页", variant="outline", key="back_home", class_name="w-full"):
+            st.session_state.page = 'home'
             st.rerun()
         st.divider()
-        st.write(f"🟢 引擎已就绪: {model_name}")
-        search_id = st.text_input("输入 Paper ID 开始解析", placeholder="例如: W2949117887")
+        search_id = st.text_input("🔍 输入 Paper ID (OpenAlex)", placeholder="W2949117887")
         st.divider()
-        st.caption("© 2026 SciOracle AI. All rights reserved.")
+        ui.alert(title="引擎状态", content=f"已连接: {model_name}", variant="default")
 
-    st.markdown("### 🔍 实时科研情报调取")
-    
-    if search_id:
-        with st.spinner('📡 正在穿透云端数据库...'):
+    # 主操作区
+    if not search_id:
+        st.markdown("<div style='height: 200px;'></div>", unsafe_allow_html=True)
+        ui.element("h2", content="等待指令", cls="text-center text-gray-500 text-3xl")
+        st.markdown("<p style='text-align: center;'>请在左侧侧边栏输入需要分析的 Paper ID。</p>", unsafe_allow_html=True)
+    else:
+        with st.spinner('📡 正在从云端调取多维度数据...'):
+            # 数据抓取逻辑
             res_abs = supabase.table("mvp_abstracts").select("abstract").eq("paper_id", search_id).execute()
             res_grants = supabase.table("mvp_grants").select("funder, award_id").eq("paper_id", search_id).execute()
             res_affil = supabase.table("mvp_authorships").select("institution_id").eq("paper_id", search_id).execute()
 
         if res_abs.data:
-            col_main, col_side = st.columns([2, 1])
-            with col_main:
-                st.markdown("#### 📄 论文摘要")
-                st.info(res_abs.data[0]['abstract'])
-                
-                if st.button("✨ 生成 AI 深度情报报告", type="primary"):
-                    with st.spinner("AI 正在深度思考中..."):
-                        prompt = f"分析该摘要的技术突破、资助逻辑和未来3年趋势：{res_abs.data[0]['abstract']}"
-                        response = model.generate_content(prompt)
-                        st.markdown("#### 📋 AI 专家研报")
-                        st.success(response.text)
-                        st.balloons()
+            # 采用 Shadcn Card 包裹结果
+            with ui.card(key="result_card"):
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    ui.element("h3", content="📝 核心摘要", cls="text-xl font-bold mb-2")
+                    st.write(res_abs.data[0]['abstract'])
+                with c2:
+                    ui.element("h3", content="📊 关键指标", cls="text-xl font-bold mb-2")
+                    ui.metric_card(title="资助方", content=res_grants.data[0]['funder'] if res_grants.data else "N/A", key="funder_card")
+                    ui.metric_card(title="项目 ID", content=res_grants.data[0]['award_id'] if res_grants.data else "N/A", key="award_card")
+
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            with col_side:
-                st.markdown("#### 📌 结构化画像")
-                st.metric("核心资助方", res_grants.data[0]['funder'] if res_grants.data else "未披露")
-                st.metric("机构关联", res_affil.data[0]['institution_id'] if res_affil.data else "未知")
-                st.write(f"项目编号: `{res_grants.data[0]['award_id'] if res_grants.data else 'N/A'}`")
+            # AI 按钮：放在显著位置
+            if ui.button("✨ 生成 AI 专家趋势报告", variant="default", key="ai_run"):
+                with st.spinner("🧠 决策大脑正在合成情报..."):
+                    prompt = f"以专家视角分析该研究的技术突破点、资助价值及未来3年技术路径：{res_abs.data[0]['abstract']}"
+                    response = model.generate_content(prompt)
+                    with ui.card(key="ai_report"):
+                        ui.element("h2", content="📋 SciOracle AI 专家研报", cls="text-2xl font-bold text-purple-400 mb-4")
+                        st.markdown(response.text)
+                        st.balloons()
         else:
-            st.error("未找到数据。请检查 ID 是否正确。")
-    else:
-        st.markdown("""
-        <div style='background: rgba(99, 102, 241, 0.1); padding: 50px; border-radius: 20px; text-align: center; border: 1px dashed #6366f1;'>
-            <h2 style='color: #6366f1;'>等待指令中...</h2>
-            <p>请在左侧侧边栏输入 Paper ID 以激活 AI 分析模块</p>
-        </div>
-        """, unsafe_allow_html=True)
+            ui.alert(title="查询失败", content="数据库中未检索到该 ID，请检查输入或联系管理员。", variant="destructive")
