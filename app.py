@@ -26,7 +26,7 @@ try:
     
     # Gemini 配置
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
 except Exception as e:
     st.error(f"配置读取失败，请检查 Secrets。错误详情: {e}")
 
