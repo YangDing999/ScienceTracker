@@ -37,32 +37,13 @@ with m_col:
 
 st.markdown("<div style='height: 60px;'></div>", unsafe_allow_html=True)
 
-# 5. 【智能导航逻辑】：自动寻找 Explore 页面
+# 5. 标准官方导航逻辑
 _, btn_col, _ = st.columns([2, 1, 2])
 with btn_col:
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     
     if st.button("🚀 开启数据探索之旅", use_container_width=True, type="primary"):
-        # 获取当前 Streamlit 识别到的所有页面
-        from streamlit.source_util import get_pages
-        # 这里的 "app.py" 必须和你当前的文件名一致
-        pages = get_pages("app.py")
-        
-        # 在识别到的页面中寻找包含 "Explore" 的路径
-        target_page_path = None
-        for page_info in pages.values():
-            if "Explore" in page_info['page_name'] or "Explore" in page_info['relative_path']:
-                target_page_path = page_info['relative_path']
-                break
-        
-        if target_page_path:
-            # 找到路径后，直接用系统提供的路径跳转
-            st.switch_page(target_page_path)
-        else:
-            # 如果系统还没索引到，给出明确提示
-            st.error("🚨 导航系统未检测到 Explore 页面。")
-            st.info("💡 解决办法：请去 Streamlit Cloud 管理后台点击 'Reboot App'。")
-            # 调试用：列出系统看到的页面（发布后可删掉）
-            # st.write("系统检测到的页面清单：", [p['page_name'] for p in pages.values()])
-            
+        # 官方标准写法，不要加任何诊断代码
+        st.switch_page("pages/1_Explore.py")
+                
     st.markdown("</div>", unsafe_allow_html=True)
