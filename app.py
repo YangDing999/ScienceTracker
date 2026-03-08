@@ -26,7 +26,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 初始化连接 (带异常处理) ---
+# --- 2. 初始化连接 ---
 @st.cache_resource
 def init_connections():
     try:
@@ -35,7 +35,7 @@ def init_connections():
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         target = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in models else models[0]
         return db, genai.GenerativeModel(target), target
-    except Exception as e:
+    except:
         return None, None, "Offline"
 
 supabase, model, model_name = init_connections()
@@ -43,6 +43,8 @@ supabase, model, model_name = init_connections()
 # --- 3. 状态管理 ---
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
+if 'selected_paper_id' not in st.session_state:
+    st.session_state.selected_paper_id = None
 
 # --- 4. 首页逻辑 ---
 if st.session_state.page == 'home':
@@ -58,7 +60,7 @@ if st.session_state.page == 'home':
         with c2:
             ui.metric_card(title="分析引擎", content="Gemini 1.5", description="多模态逻辑推理能力", key="m2")
         with c3:
-            ui.metric_card(title="处理速度", content="实时", description="毫秒级云端响应", key="m3")
+            ui.metric_card(title="查询速度", content="实时", description="模糊匹配毫秒响应", key="m3")
     
     st.markdown("<div style='height: 60px;'></div>", unsafe_allow_html=True)
     
@@ -67,63 +69,86 @@ if st.session_state.page == 'home':
         with ui.card(key="explore_card"):
             st.markdown("<div style='text-align: center; padding: 10px;'>", unsafe_allow_html=True)
             ui.element("h3", content="准备好深入了吗？", cls="text-lg mb-4")
-            if ui.button("🚀 开启数据探索", key="start_btn", class_name="w-full"):
+            if ui.button("🚀 开启探索", key="start_btn", class_name="w-full"):
                 st.session_state.page = 'explore'
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 5. 探索工作台 ---
+# --- 5. 探索工作台 (核心升级区) ---
 else:
     with st.sidebar:
         st.markdown("<h2 class='hero-text' style='font-size: 2rem;'>SciOracle</h2>", unsafe_allow_html=True)
-        if ui.button("🏠 返回首页门户", key="back_btn", class_name="w-full"):
+        if ui.button("🏠 返回首页", key="back_btn", class_name="w-full"):
             st.session_state.page = 'home'
             st.rerun()
         st.divider()
-        search_id = st.text_input("🔍 输入 Paper ID", placeholder="W2949117887")
-        st.divider()
         
-        # --- 这里的报错修复了：移除不确定的参数 ---
-        try:
-            ui.alert(title="系统状态", description=f"已连接引擎: {model_name}", key="status_info")
-        except:
-            st.info(f"🤖 引擎已连接: {model_name}")
+        # 模式选择
+        search_mode = st.radio("选择搜索模式", ["关键词搜索", "Paper ID 精确查询"])
+        
+        if search_mode == "Paper ID 精确查询":
+            input_val = st.text_input("🔍 输入 Paper ID", placeholder="W2949117887")
+            if input_val: st.session_state.selected_paper_id = input_val
+        else:
+            keyword = st.text_input("🔑 输入关键词", placeholder="例如: AI, Cancer, Robot")
+        
+        st.divider()
+        st.info(f"🤖 引擎: {model_name}")
 
-    if not search_id:
-        st.markdown("<div style='height: 200px;'></div>", unsafe_allow_html=True)
-        ui.element("h2", content="请在左侧侧边栏输入 Paper ID", cls="text-center text-gray-400 text-3xl")
-    else:
-        with st.spinner('📡 正在解析全球科研图谱...'):
-            res_abs = supabase.table("mvp_abstracts").select("abstract").eq("paper_id", search_id).execute()
-            res_grants = supabase.table("mvp_grants").select("funder, award_id").eq("paper_id", search_id).execute()
-            res_affil = supabase.table("mvp_authorships").select("institution_id").eq("paper_id", search_id).execute()
+    # 主界面显示逻辑
+    if search_mode == "关键词搜索" and keyword:
+        st.markdown(f"### 🔍 包含关键词 '{keyword}' 的研究成果")
+        with st.spinner('正在搜索全量摘要数据库...'):
+            # 模糊查询前 10 条结果
+            res = supabase.table("mvp_abstracts").select("paper_id, abstract").ilike("abstract", f"%{keyword}%").limit(10).execute()
+        
+        if res.data:
+            for item in res.data:
+                with ui.card(key=f"card_{item['paper_id']}"):
+                    st.markdown(f"**ID:** `{item['paper_id']}`")
+                    # 只显示摘要的前 200 个字
+                    st.write(item['abstract'][:200] + "...")
+                    if st.button("查看深度 AI 分析", key=f"btn_{item['paper_id']}"):
+                        st.session_state.selected_paper_id = item['paper_id']
+                        st.rerun()
+        else:
+            st.warning("未找到匹配的论文，请换个词试试。")
+
+    # 如果选定了某个 Paper ID (无论是通过 ID 输入还是列表点击)
+    if st.session_state.selected_paper_id:
+        curr_id = st.session_state.selected_paper_id
+        st.markdown(f"### 📑 深度情报分析: `{curr_id}`")
+        
+        with st.spinner('📡 调取详细资助与机构数据...'):
+            res_abs = supabase.table("mvp_abstracts").select("abstract").eq("paper_id", curr_id).execute()
+            res_grants = supabase.table("mvp_grants").select("funder, award_id").eq("paper_id", curr_id).execute()
+            res_affil = supabase.table("mvp_authorships").select("institution_id").eq("paper_id", curr_id).execute()
 
         if res_abs.data:
             with ui.card(key="main_res"):
-                col_info, col_metrics = st.columns([2, 1])
-                with col_info:
-                    ui.element("h3", content="📖 论文核心摘要", cls="text-xl font-bold mb-4 text-indigo-400")
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    ui.element("h3", content="📖 摘要原文", cls="text-xl font-bold mb-4 text-indigo-400")
                     st.write(res_abs.data[0]['abstract'])
-                with col_metrics:
+                with col2:
                     ui.element("h3", content="🛡️ 资助背景", cls="text-xl font-bold mb-4 text-indigo-400")
-                    ui.metric_card(title="资助机构", content=res_grants.data[0]['funder'] if res_grants.data else "未披露", key="res_funder")
-                    ui.metric_card(title="项目号", content=res_grants.data[0]['award_id'] if res_grants.data else "N/A", key="res_award")
+                    ui.metric_card(title="资助机构", content=res_grants.data[0]['funder'] if res_grants.data else "未披露", key="res_f")
+                    ui.metric_card(title="项目号", content=res_grants.data[0]['award_id'] if res_grants.data else "N/A", key="res_a")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if ui.button("✨ 启动 AI 深度决策分析", key="run_ai", class_name="w-full"):
+            if ui.button("✨ 启动 AI 专家分析报告", key="run_ai", class_name="w-full"):
                 with st.spinner("🧠 SciOracle AI 正在合成情报报告..."):
-                    try:
-                        prompt = f"请以科学战略顾问的身份，分析以下研究的技术独特性、潜在价值及未来趋势：{res_abs.data[0]['abstract']}"
-                        response = model.generate_content(prompt)
-                        with ui.card(key="ai_report_card"):
-                            ui.element("h2", content="📋 SciOracle AI 专家研报", cls="text-2xl font-bold mb-4 text-rose-400")
-                            st.markdown(response.text)
-                            st.balloons()
-                    except Exception as e:
-                        st.error(f"AI 分析失败: {str(e)}")
-        else:
-            try:
-                ui.alert(title="查询无结果", description="云端数据库中未检索到该 ID。", variant="destructive", key="query_fail")
-            except:
-                st.error("❌ 查询无结果：数据库中未检索到该 Paper ID。")
+                    prompt = f"分析该摘要的技术突破点、潜在价值及未来趋势：{res_abs.data[0]['abstract']}"
+                    response = model.generate_content(prompt)
+                    with ui.card(key="ai_report"):
+                        ui.element("h2", content="📋 SciOracle AI 专家研报", cls="text-2xl font-bold mb-4 text-rose-400")
+                        st.markdown(response.text)
+                        st.balloons()
+        
+        # 增加一个清除选择的按钮
+        if st.button("❌ 关闭分析，返回搜索列表"):
+            st.session_state.selected_paper_id = None
+            st.rerun()
+
+    elif not keyword and search_mode == "关键词搜索":
+        st.markdown("<div style='height: 200px;'></div>", unsafe_allow_html=True)
+        ui.element("h2", content="请输入关键词开始探索", cls="text-center text-gray-400 text-3xl")
