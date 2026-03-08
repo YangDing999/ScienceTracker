@@ -43,11 +43,22 @@ with m_col:
 
 st.markdown("<div style='height: 60px;'></div>", unsafe_allow_html=True)
 
-# 5. 导航按钮：改用 switch_page 避开路径 Bug
+# 5. 健壮的导航逻辑
 _, btn_col, _ = st.columns([2, 1, 2])
 with btn_col:
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    
+    # 使用正常的按钮触发
     if st.button("🚀 开启数据探索之旅", use_container_width=True, type="primary"):
-        # switch_page 是处理多页面跳转最稳健的方式
-        st.switch_page("pages/1_Explore.py")
+        try:
+            # 尝试标准路径
+            st.switch_page("pages/1_Explore.py")
+        except Exception:
+            try:
+                # 备选：如果 Streamlit 索引去掉了 pages/ 前缀
+                st.switch_page("1_Explore.py")
+            except Exception:
+                st.error("🚨 导航系统迷路了：请检查 pages 文件夹中是否存在 1_Explore.py 文件。")
+                st.info("💡 提示：请确保 GitHub 上的文件夹名为小写的 'pages'。")
+                
     st.markdown("</div>", unsafe_allow_html=True)
